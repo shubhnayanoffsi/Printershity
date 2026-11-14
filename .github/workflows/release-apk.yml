@@ -15,16 +15,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Create or Update v2.1.0 Release with APK
+      - name: Create or Update v2.2.0 Release with APK
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git tag -f v2.1.0
-          git push origin v2.1.0 --force
-          if gh release view v2.1.0 >/dev/null 2>&1; then
-            gh release upload v2.1.0 Brother-HL1201-Print.apk --clobber
+          git tag -f v2.2.0
+          git push origin v2.2.0 --force
+          if gh release view v2.2.0 >/dev/null 2>&1; then
+            gh release upload v2.2.0 Brother-HL1201-Print.apk --clobber
           else
-            gh release create v2.1.0 Brother-HL1201-Print.apk \
-              --title "Printshity v2.1.0 — Brother HL-1201 Android APK" \
+            gh release create v2.2.0 Brother-HL1201-Print.apk \
+              --title "Printshity v2.2.0 — Brother HL-1201 Android APK" \
               --notes "Brother HL-1201 USB OTG Android app. Version 2.1 uses Android print services for API 35+ for current Android devices."
           fi

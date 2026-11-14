@@ -44,18 +44,20 @@ npm run build
 
 ## Android APK
 
-Download and install the signed Android app from the repository's latest release:
+Download the current signed Android app from the latest GitHub release:
 
 [Download Brother HL-1201 Print APK](https://github.com/shubhnayanoffsi/Printershity/releases/latest/download/Brother-HL1201-Print.apk)
 
-The current package is version 2.1 (version code 3), targets Android 15 / API 35, and supports Android 16. It requires a USB-host capable Android device, a USB-C OTG adapter, and an Android print service that supports USB OTG. The app sends prepared pages through Android Print Framework so the selected service can render the HL-1201-specific printer language. Install and enable a USB-OTG print service such as NokoPrint, then select it in the Android print dialog.
+The Android app includes the GPL brlaser Brother HL-1200-series raster encoder and sends the generated raster job directly to the printer's USB bulk OUT endpoint. It does not route print data through another app or Android's print service. It requires an ARM64 Android device with USB host/OTG, a USB-C OTG adapter, and a USB A-to-B cable.
 
-### Build the APK locally
+### Build
 
-Install a JDK and Android SDK platform 35, then run from the repository root:
+Install a JDK, Android SDK platform 35, and the Android ARM64 cross compiler. From the repository root run:
 
 ```sh
 ANDROID_SDK_ROOT=/path/to/android-sdk sh android-app/build-apk.sh
 ```
 
-The script writes `Brother-HL1201-Print.apk` at the repository root and updates the website download at `public/Brother-HL1201-Print.apk`. It creates a local signing key in `android-app/.signing/`; keep that directory private and backed up if you need future APKs to install as updates. The key is ignored by Git and is not bundled inside the APK.
+The script creates the app APK at the repository root and refreshes the website copy in `public/`. The signing key is generated locally in `android-app/.signing/`; keep it private and backed up for later APK updates.
+
+The Android app and included brlaser encoder are distributed under GPL-2.0-or-later; see [LICENSE](LICENSE) and the upstream attribution in `android-app/src/main/cpp/README.md`.

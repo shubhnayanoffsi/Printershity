@@ -7,7 +7,6 @@ import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.print.PrintManager;
 import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
@@ -28,6 +27,9 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import java.util.HashMap;
 
@@ -59,6 +61,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        BrotherRaster.ensureLoaded();
 
         usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
         IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
@@ -96,8 +99,7 @@ public class MainActivity extends Activity {
                 }
                 MainActivity.this.filePathCallback = filePathCallback;
 
-                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                Intent intent = fileChooserParams.createIntent();
                 intent.setType("image/*");
                 intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
                 startActivityForResult(Intent.createChooser(intent, "Select Images"), FILE_CHOOSER_RESULT_CODE);
@@ -196,20 +198,72 @@ public class MainActivity extends Activity {
 
     public class AndroidUsbBridge {
         @JavascriptInterface
-        public void printDocument() {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE);
-                    if (printManager == null || webView == null) {
-                        return;
+        public String printRasterJob(String packedBase64, int width, int height, int rowBytes,
+                                     int copies, String paper) {
+            UsbDevice device = targetPrinter != null ? targetPrinter : findBrotherPrinter();
+            if (device == null) {
+                return "No USB printer found. Check the OTG adapter and USB A-to-B cable.";
+            }
+            targetPrinter = device;
+            if (!usbManager.hasPermission(device)) {
+                usbManager.requestPermission(device, createUsbPermissionIntent());
+                return "Allow USB access, then tap Print again.";
+            }
+
+            byte[] packed;
+            byte[] jobBytes;
+            try {
+                packed = Base64.decode(packedBase64, Base64.DEFAULT);
+                jobBytes = BrotherRaster.encode(packed, width, height, rowBytes, copies, paper);
+            } catch (Exception error) {
+                return "Could not encode the Brother raster job: " + error.getMessage();
+            }
+            if (jobBytes == null || jobBytes.length == 0) {
+                return "Brother raster encoding failed.";
+            }
+
+            UsbInterface printerInterface = null;
+            UsbEndpoint outEndpoint = null;
+            for (int i = 0; i < device.getInterfaceCount() && outEndpoint == null; i++) {
+                UsbInterface candidate = device.getInterface(i);
+                for (int j = 0; j < candidate.getEndpointCount(); j++) {
+                    UsbEndpoint endpoint = candidate.getEndpoint(j);
+                    if (endpoint.getDirection() == UsbConstants.USB_DIR_OUT &&
+                            endpoint.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK) {
+                        printerInterface = candidate;
+                        outEndpoint = endpoint;
+                        break;
                     }
-                    printManager.print(
-                            "Brother HL-1201 image job",
-                            webView.createPrintDocumentAdapter("Brother HL-1201 image job"),
-                            null);
                 }
-            });
+            }
+            if (printerInterface == null || outEndpoint == null) {
+                return "Printer bulk USB endpoint not found.";
+            }
+
+            UsbDeviceConnection connection = usbManager.openDevice(device);
+            if (connection == null) return "Could not open the USB printer.";
+            try {
+                if (!connection.claimInterface(printerInterface, true)) {
+                    return "Could not claim the printer USB interface.";
+                }
+                int offset = 0;
+                while (offset < jobBytes.length) {
+                    int length = Math.min(16384, jobBytes.length - offset);
+                    byte[] chunk = new byte[length];
+                    System.arraycopy(jobBytes, offset, chunk, 0, length);
+                    int sent = connection.bulkTransfer(outEndpoint, chunk, length, 30000);
+                    if (sent <= 0) return "USB transfer stopped at byte " + offset + ".";
+                    offset += sent;
+                }
+                return "Sent " + jobBytes.length + " bytes using the Brother HL-1200 raster protocol.";
+            } finally {
+                connection.releaseInterface(printerInterface);
+                connection.close();
+            }
         }
+    }
+
+    static {
+        System.loadLibrary("brlaser_jni");
     }
 }

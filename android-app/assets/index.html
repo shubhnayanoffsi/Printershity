@@ -576,42 +576,55 @@ function renderUI() {
 }
 
 
+function rasterBase64(imgData, sheetWidthMm, sheetHeightMm) {
+  const targetWidth = Math.round(sheetWidthMm * 600 / 25.4);
+  const targetHeight = Math.round(sheetHeightMm * 600 / 25.4);
+  const rowBytes = Math.ceil(targetWidth / 8);
+  const raster = new Uint8Array(rowBytes * targetHeight);
+  const source = imgData.data;
+
+  for (let y = 0; y < targetHeight; y++) {
+    const sourceY = Math.min(imgData.height - 1, Math.floor(y * imgData.height / targetHeight));
+    const sourceRow = sourceY * imgData.width;
+    const destRow = y * rowBytes;
+    for (let x = 0; x < targetWidth; x++) {
+      const sourceX = Math.min(imgData.width - 1, Math.floor(x * imgData.width / targetWidth));
+      if (source[(sourceRow + sourceX) * 4] < 128) {
+        raster[destRow + (x >> 3)] |= 0x80 >> (x & 7);
+      }
+    }
+  }
+
+  let binary = '';
+  const chunkSize = 32768;
+  for (let i = 0; i < raster.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, raster.subarray(i, i + chunkSize));
+  }
+  return {base64: btoa(binary), width: targetWidth, height: targetHeight, rowBytes};
+}
+
 function printJob() {
   const cfg = getSettings();
   const pages = getPages();
   if (pages.length === 0) return;
 
-  showStatus('Preparing print job…');
+  const paper = ['A4', 'A5', 'B5', 'EXECUTIVE', 'LEGAL', 'LETTER'].includes(cfg.pjl)
+    ? cfg.pjl : 'A4';
+  showStatus('Preparing 600 DPI Brother raster pages…');
   setTimeout(() => {
-    const printOutput = document.getElementById('printOutput');
-    printOutput.replaceChildren();
-    const pageStyle = document.getElementById('printPageStyle') || document.createElement('style');
-    pageStyle.id = 'printPageStyle';
-    pageStyle.textContent = '@page { size: ' + cfg.wMm + 'mm ' + cfg.hMm + 'mm; margin: 0; }';
-    document.head.appendChild(pageStyle);
-
-    let outputPage = 0;
-    for (let copy = 0; copy < cfg.copies; copy++) {
-      for (let i = 0; i < pages.length; i++) {
-        const canvas = document.createElement('canvas');
-        renderSheetCanvas(canvas, pages[i], cfg, 5.0, false);
-        const sheet = document.createElement('div');
-        sheet.className = 'print-page';
-        sheet.style.width = cfg.wMm + 'mm';
-        sheet.style.height = cfg.hMm + 'mm';
-        const image = document.createElement('img');
-        image.alt = 'Print page ' + (++outputPage);
-        image.src = canvas.toDataURL('image/png');
-        sheet.appendChild(image);
-        printOutput.appendChild(sheet);
+    try {
+      const canvas = document.createElement('canvas');
+      for (let page = 0; page < pages.length; page++) {
+        const imageData = renderSheetCanvas(canvas, pages[page], cfg, 300 / 25.4, false);
+        const raster = rasterBase64(imageData, cfg.wMm, cfg.hMm);
+        const result = window.AndroidUsb.printRasterJob(
+          raster.base64, raster.width, raster.height, raster.rowBytes, cfg.copies, paper
+        );
+        showStatus(result);
+        if (!result.startsWith('Sent ')) return;
       }
-    }
-
-    showStatus('Choose an Android print service that supports USB OTG for this printer.');
-    if (window.AndroidUsb) {
-      window.AndroidUsb.printDocument();
-    } else {
-      window.print();
+    } catch (error) {
+      showStatus(error instanceof Error ? error.message : 'Could not prepare the USB print job.');
     }
   }, 50);
 }

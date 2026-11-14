@@ -8,6 +8,10 @@ PLATFORM=${ANDROID_PLATFORM:-android-35}
 TOOLS_VERSION=${ANDROID_BUILD_TOOLS:-35.0.0}
 ANDROID_JAR="$SDK_ROOT/platforms/$PLATFORM/android.jar"
 OUT="$REPO_DIR/Brother-HL1201-Print.apk"
+JNI_SOURCE="$APP_DIR/src/main/cpp/brlaser"
+JNI_LIBS="$APP_DIR/src/main/jniLibs/arm64-v8a"
+CXX=${ANDROID_CXX:-aarch64-linux-android-clang++}
+JAVA_HOME=${JAVA_HOME:-/data/data/com.termux/files/usr/lib/jvm/java-21-openjdk}
 
 if [ ! -f "$ANDROID_JAR" ]; then
   echo "Android platform jar not found: $ANDROID_JAR" >&2
@@ -35,21 +39,27 @@ APKSIGNER=$(find_tool apksigner)
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT HUP INT TERM
-mkdir -p "$WORK/gen" "$WORK/classes" "$WORK/dex"
+mkdir -p "$WORK/gen" "$WORK/classes" "$WORK/dex" "$WORK/native/lib/arm64-v8a"
 
 "$AAPT" package -f \
   -M "$APP_DIR/AndroidManifest.xml" \
   -S "$APP_DIR/res" \
   -A "$APP_DIR/assets" \
   -I "$ANDROID_JAR" \
-  --min-sdk-version 21 \
+  --min-sdk-version 24 \
   --target-sdk-version 35 \
-  --version-code 3 \
-  --version-name 2.1 \
+  --version-code 4 \
+  --version-name 2.2 \
   -J "$WORK/gen" \
   -F "$WORK/base.apk"
 
-find "$APP_DIR/src" "$WORK/gen" -name '*.java' -print > "$WORK/sources.txt"
+"$CXX" -std=c++17 -O2 -fPIC -shared -stdlib=libc++ \
+  -I"$JNI_SOURCE" -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" \
+  "$JNI_SOURCE/jni_bridge.cc" "$JNI_SOURCE/job.cc" "$JNI_SOURCE/line.cc" \
+  -o "$WORK/native/lib/arm64-v8a/libbrlaser_jni.so"
+cp "${PREFIX:-/data/data/com.termux/files/usr}/lib/libc++_shared.so" "$WORK/native/lib/arm64-v8a/libc++_shared.so"
+
+find "$APP_DIR/src/com" "$WORK/gen" -name '*.java' -print > "$WORK/sources.txt"
 javac -source 8 -target 8 -bootclasspath "$ANDROID_JAR" \
   -d "$WORK/classes" @"$WORK/sources.txt"
 
@@ -60,6 +70,8 @@ find "$WORK/classes" -name '*.class' -print > "$WORK/classes.txt"
 
 cp "$WORK/base.apk" "$WORK/unsigned.apk"
 jar uf "$WORK/unsigned.apk" -C "$WORK/dex" classes.dex
+jar uf "$WORK/unsigned.apk" -C "$WORK/native" lib/arm64-v8a/libbrlaser_jni.so
+jar uf "$WORK/unsigned.apk" -C "$WORK/native" lib/arm64-v8a/libc++_shared.so
 "$ZIPALIGN" -f -p 4 "$WORK/unsigned.apk" "$WORK/aligned.apk"
 
 SIGNING_DIR="$APP_DIR/.signing"
