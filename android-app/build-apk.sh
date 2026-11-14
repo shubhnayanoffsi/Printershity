@@ -44,8 +44,8 @@ mkdir -p "$WORK/gen" "$WORK/classes" "$WORK/dex"
   -I "$ANDROID_JAR" \
   --min-sdk-version 21 \
   --target-sdk-version 35 \
-  --version-code 2 \
-  --version-name 2.0 \
+  --version-code 3 \
+  --version-name 2.1 \
   -J "$WORK/gen" \
   -F "$WORK/base.apk"
 

@@ -164,6 +164,14 @@
     background: #ffffff;
     display: block;
   }
+  #printOutput { display: none; }
+  @media print {
+    header, #status, .container { display: none !important; }
+    #printOutput { display: block; }
+    .print-page { page-break-after: always; break-after: page; overflow: hidden; }
+    .print-page:last-child { page-break-after: auto; break-after: auto; }
+    .print-page img { display: block; width: 100%; height: 100%; object-fit: fill; }
+  }
 </style>
 </head>
 <body>
@@ -171,7 +179,6 @@
 <header>
   <span class="title">Brother HL-1201 Print</span>
   <div class="header-actions">
-    <button type="button" id="usbBtn" onclick="connectUsb()">Connect USB OTG</button>
     <button type="button" class="primary" id="printBtn" onclick="printJob()" disabled>Print (0 Pages)</button>
   </div>
 </header>
@@ -287,6 +294,7 @@
     </div>
   </div>
 </div>
+<div id="printOutput"></div>
 
 <script>
 const SIZES = {
@@ -567,114 +575,47 @@ function renderUI() {
   renderSheetCanvas(canvas, pages[pageIdx], cfg, 3.0, true);
 }
 
-function connectUsb() {
-  if (window.AndroidUsb) {
-    const res = window.AndroidUsb.connectPrinter();
-    showStatus(res);
-  } else {
-    showStatus('USB OTG Bridge ready.');
-  }
-}
-
-function encodePrnBase64(bitmaps, cfg) {
-  const header = [
-    '\x1b%-12345X@PJL JOB NAME="HL1201_ANDROID_OTG"',
-    '@PJL SET RESOLUTION = 600',
-    '@PJL SET ECONOMODE = OFF',
-    '@PJL SET MEDIATYPE = REGULAR',
-    '@PJL SET SOURCETRAY = AUTO',
-    '@PJL SET PAPER = ' + cfg.pjl,
-    '@PJL SET ORIENTATION = ' + orient.toUpperCase(),
-    '@PJL SET COPIES = ' + cfg.copies,
-    '@PJL ENTER LANGUAGE = PCL',
-    ''
-  ].join('\r\n');
-
-  const bytes = [];
-  for (let i = 0; i < header.length; i++) bytes.push(header.charCodeAt(i));
-
-  for (let p = 0; p < bitmaps.length; p++) {
-    const bmp = bitmaps[p];
-    const w = bmp.width, h = bmp.height;
-    const rowLen = Math.ceil(w / 8);
-    const rowBuf = new Uint8Array(rowLen);
-
-    const initCmd = '\x1bE\x1b*t600R\x1b*r1A';
-    for (let i = 0; i < initCmd.length; i++) bytes.push(initCmd.charCodeAt(i));
-
-    for (let y = 0; y < h; y++) {
-      rowBuf.fill(0);
-      let hasBlack = false;
-      const yOff = y * w;
-      for (let x = 0; x < w; x++) {
-        if (bmp.data[(yOff + x) * 4] < 128) {
-          rowBuf[x >> 3] |= (0x80 >> (x & 7));
-          hasBlack = true;
-        }
-      }
-      if (!hasBlack) {
-        bytes.push(0xff);
-        continue;
-      }
-      const rle = [];
-      let i = 0;
-      while (i < rowLen) {
-        let run = 1;
-        while (i + run < rowLen && run < 128 && rowBuf[i + run] === rowBuf[i]) run++;
-        if (run > 2) {
-          rle.push((257 - run) & 0xff, rowBuf[i]);
-          i += run;
-        } else {
-          const start = i;
-          let lit = 0;
-          while (i < rowLen && lit < 128) {
-            if (i + 2 < rowLen && rowBuf[i] === rowBuf[i + 1] && rowBuf[i] === rowBuf[i + 2]) break;
-            i++; lit++;
-          }
-          rle.push((lit - 1) & 0xff);
-          for (let k = 0; k < lit; k++) rle.push(rowBuf[start + k]);
-        }
-      }
-      const cmd = '\x1b*b' + rle.length + 'W';
-      for (let c = 0; c < cmd.length; c++) bytes.push(cmd.charCodeAt(c));
-      for (let c = 0; c < rle.length; c++) bytes.push(rle[c]);
-    }
-    const endCmd = '\x1b*rC\x0c';
-    for (let i = 0; i < endCmd.length; i++) bytes.push(endCmd.charCodeAt(i));
-  }
-
-  const footer = '\x1b%-12345X@PJL EOJ\r\n\x1b%-12345X';
-  for (let i = 0; i < footer.length; i++) bytes.push(footer.charCodeAt(i));
-
-  let binary = '';
-  const chunk = 8192;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode.apply(null, bytes.slice(i, i + chunk));
-  }
-  return btoa(binary);
-}
 
 function printJob() {
   const cfg = getSettings();
   const pages = getPages();
   if (pages.length === 0) return;
 
-  showStatus('Preparing ' + (pages.length * cfg.copies) + ' page(s)...');
+  showStatus('Preparing print job…');
   setTimeout(() => {
-    const offscreen = document.createElement('canvas');
-    const bitmaps = [];
-    for (let i = 0; i < pages.length; i++) {
-      bitmaps.push(renderSheetCanvas(offscreen, pages[i], cfg, 8.0, false));
+    const printOutput = document.getElementById('printOutput');
+    printOutput.replaceChildren();
+    const pageStyle = document.getElementById('printPageStyle') || document.createElement('style');
+    pageStyle.id = 'printPageStyle';
+    pageStyle.textContent = '@page { size: ' + cfg.wMm + 'mm ' + cfg.hMm + 'mm; margin: 0; }';
+    document.head.appendChild(pageStyle);
+
+    let outputPage = 0;
+    for (let copy = 0; copy < cfg.copies; copy++) {
+      for (let i = 0; i < pages.length; i++) {
+        const canvas = document.createElement('canvas');
+        renderSheetCanvas(canvas, pages[i], cfg, 5.0, false);
+        const sheet = document.createElement('div');
+        sheet.className = 'print-page';
+        sheet.style.width = cfg.wMm + 'mm';
+        sheet.style.height = cfg.hMm + 'mm';
+        const image = document.createElement('img');
+        image.alt = 'Print page ' + (++outputPage);
+        image.src = canvas.toDataURL('image/png');
+        sheet.appendChild(image);
+        printOutput.appendChild(sheet);
+      }
     }
+
+    showStatus('Choose an Android print service that supports USB OTG for this printer.');
     if (window.AndroidUsb) {
-      const b64 = encodePrnBase64(bitmaps, cfg);
-      const res = window.AndroidUsb.printBase64Job(b64);
-      showStatus(res);
+      window.AndroidUsb.printDocument();
     } else {
       window.print();
     }
   }, 50);
 }
+
 </script>
 </body>
 </html>

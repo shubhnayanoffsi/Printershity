@@ -7,6 +7,7 @@ import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.print.PrintManager;
 import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
@@ -195,73 +196,20 @@ public class MainActivity extends Activity {
 
     public class AndroidUsbBridge {
         @JavascriptInterface
-        public String connectPrinter() {
-            UsbDevice dev = findBrotherPrinter();
-            if (dev == null) {
-                return "No USB printer found. Connect Brother HL-1201 via USB-C OTG.";
-            }
-            targetPrinter = dev;
-            if (!usbManager.hasPermission(dev)) {
-                usbManager.requestPermission(dev, createUsbPermissionIntent());
-                return "Allow the USB OTG permission prompt on screen.";
-            }
-            return "Connected: Brother HL-1201 (USB OTG)";
-        }
-
-        @JavascriptInterface
-        public String printBase64Job(String base64Payload) {
-            UsbDevice dev = targetPrinter != null ? targetPrinter : findBrotherPrinter();
-            if (dev == null) {
-                return "Printer not connected on USB OTG.";
-            }
-            if (!usbManager.hasPermission(dev)) {
-                usbManager.requestPermission(dev, createUsbPermissionIntent());
-                return "Allow USB OTG permission and tap Print again.";
-            }
-
-            byte[] data = Base64.decode(base64Payload, Base64.DEFAULT);
-            UsbInterface usbInterface = dev.getInterface(0);
-            UsbEndpoint outEndpoint = null;
-
-            for (int i = 0; i < usbInterface.getEndpointCount(); i++) {
-                UsbEndpoint ep = usbInterface.getEndpoint(i);
-                if (ep.getDirection() == UsbConstants.USB_DIR_OUT) {
-                    outEndpoint = ep;
-                    break;
-                }
-            }
-
-            if (outEndpoint == null) {
-                return "USB OUT endpoint not found.";
-            }
-
-            UsbDeviceConnection conn = usbManager.openDevice(dev);
-            if (conn == null) {
-                return "Could not open USB OTG device.";
-            }
-
-            try {
-                conn.claimInterface(usbInterface, true);
-                int chunkSize = 16384;
-                int offset = 0;
-                while (offset < data.length) {
-                    int len = Math.min(chunkSize, data.length - offset);
-                    byte[] chunk = new byte[len];
-                    System.arraycopy(data, offset, chunk, 0, len);
-                    int transferred = conn.bulkTransfer(outEndpoint, chunk, len, 15000);
-                    if (transferred < 0) {
-                        return "USB transfer failed at byte " + offset;
+        public void printDocument() {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE);
+                    if (printManager == null || webView == null) {
+                        return;
                     }
-                    if (transferred == 0) {
-                        return "USB transfer stopped at byte " + offset;
-                    }
-                    offset += transferred;
+                    printManager.print(
+                            "Brother HL-1201 image job",
+                            webView.createPrintDocumentAdapter("Brother HL-1201 image job"),
+                            null);
                 }
-                return "Printed (" + (data.length / 1024) + " KB sent over USB OTG).";
-            } finally {
-                conn.releaseInterface(usbInterface);
-                conn.close();
-            }
+            });
         }
     }
 }

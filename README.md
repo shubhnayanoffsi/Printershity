@@ -48,7 +48,7 @@ Download and install the signed Android app from the repository's latest release
 
 [Download Brother HL-1201 Print APK](https://github.com/shubhnayanoffsi/Printershity/releases/latest/download/Brother-HL1201-Print.apk)
 
-The current package is version 2.0 (version code 2), targets Android 15 / API 35, and supports Android 16. It requires a USB-host capable Android device and a USB-C OTG adapter.
+The current package is version 2.1 (version code 3), targets Android 15 / API 35, and supports Android 16. It requires a USB-host capable Android device, a USB-C OTG adapter, and an Android print service that supports USB OTG. The app sends prepared pages through Android Print Framework so the selected service can render the HL-1201-specific printer language. Install and enable a USB-OTG print service such as NokoPrint, then select it in the Android print dialog.
 
 ### Build the APK locally
 
