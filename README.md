@@ -40,3 +40,22 @@ npm run build
    Open the application in a top-level Chrome tab on Android (connected via USB-C OTG) or Desktop, click **Pair USB-OTG Printer**, select `Brother HL-1201 (0x04F9)`, and stream the compiled PJL+RLE buffer directly to USB Endpoint OUT.
 3. **Raw `.PRN` Export + Portable Python / Termux Script:**
    Click **Download Raw Brother .PRN** and send it via `/dev/usb/lp0` or `pyusb` using the included Python script in the **Portable CLI & Specs** tab.
+
+
+## Android APK
+
+Download and install the signed Android app from the repository's latest release:
+
+[Download Brother HL-1201 Print APK](https://github.com/shubhnayanoffsi/Printershity/releases/latest/download/Brother-HL1201-Print.apk)
+
+The current package is version 2.0 (version code 2), targets Android 15 / API 35, and supports Android 16. It requires a USB-host capable Android device and a USB-C OTG adapter.
+
+### Build the APK locally
+
+Install a JDK and Android SDK platform 35, then run from the repository root:
+
+```sh
+ANDROID_SDK_ROOT=/path/to/android-sdk sh android-app/build-apk.sh
+```
+
+The script writes `Brother-HL1201-Print.apk` at the repository root and updates the website download at `public/Brother-HL1201-Print.apk`. It creates a local signing key in `android-app/.signing/`; keep that directory private and backed up if you need future APKs to install as updates. The key is ignored by Git and is not bundled inside the APK.

@@ -17,6 +17,10 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Base64;
+import android.graphics.Insets;
+import android.view.View;
+import android.view.Window;
+import android.view.WindowInsets;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -57,7 +61,11 @@ public class MainActivity extends Activity {
 
         usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
         IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
-        registerReceiver(usbReceiver, filter);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(usbReceiver, filter);
+        }
 
         Intent launchIntent = getIntent();
         if (launchIntent != null && UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(launchIntent.getAction())) {
@@ -97,7 +105,25 @@ public class MainActivity extends Activity {
         });
 
         setContentView(webView);
+        applySystemBarInsets(webView);
         webView.loadUrl("file:///android_asset/index.html");
+    }
+
+    private void applySystemBarInsets(final View content) {
+        if (Build.VERSION.SDK_INT >= 35) {
+            Window window = getWindow();
+            window.setDecorFitsSystemWindows(false);
+            content.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+                @Override
+                public WindowInsets onApplyWindowInsets(View view, WindowInsets windowInsets) {
+                    Insets bars = windowInsets.getInsets(
+                            WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                    view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                    return windowInsets;
+                }
+            });
+            content.requestApplyInsets();
+        }
     }
 
     @Override
@@ -147,7 +173,8 @@ public class MainActivity extends Activity {
     private PendingIntent createUsbPermissionIntent() {
         Intent intent = new Intent(ACTION_USB_PERMISSION);
         intent.setPackage(getPackageName());
-        int flags = (Build.VERSION.SDK_INT >= 31) ? 0x02000000 : 0; // FLAG_MUTABLE on Android 12+
+        int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                ? PendingIntent.FLAG_MUTABLE : 0;
         return PendingIntent.getBroadcast(this, 0, intent, flags);
     }
 
@@ -225,7 +252,10 @@ public class MainActivity extends Activity {
                     if (transferred < 0) {
                         return "USB transfer failed at byte " + offset;
                     }
-                    offset += len;
+                    if (transferred == 0) {
+                        return "USB transfer stopped at byte " + offset;
+                    }
+                    offset += transferred;
                 }
                 return "Printed (" + (data.length / 1024) + " KB sent over USB OTG).";
             } finally {

@@ -5,3 +5,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local signing material (never commit)
+android-app/.signing/
