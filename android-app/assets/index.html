@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Brother HL-1201 Print</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f8fafc;
+    color: #0f172a;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .title { font-weight: 700; font-size: 15px; }
+  .header-actions { display: flex; gap: 8px; }
+  button {
+    font: inherit;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #0f172a;
+    cursor: pointer;
+  }
+  button.primary {
+    background: #0f172a;
+    color: #ffffff;
+    border-color: #0f172a;
+  }
+  button:disabled { opacity: 0.4; }
+  #status {
+    background: #0f172a;
+    color: #ffffff;
+    padding: 8px 16px;
+    font-family: monospace;
+    font-size: 12px;
+    display: none;
+  }
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 14px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  @media (min-width: 768px) {
+    .container { grid-template-columns: 380px 1fr; }
+  }
+  .card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .card-title { font-weight: 700; font-size: 14px; }
+  .file-list {
+    max-height: 210px;
+    overflow-y: auto;
+    border-top: 1px solid #f1f5f9;
+  }
+  .file-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 0;
+    border-bottom: 1px solid #f1f5f9;
+    gap: 8px;
+  }
+  .file-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .file-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+  }
+  .thumb {
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid #cbd5e1;
+  }
+  .field { margin-bottom: 12px; }
+  .field label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #334155;
+  }
+  select, input[type="number"] {
+    width: 100%;
+    padding: 7px 9px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #f8fafc;
+    font: inherit;
+  }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .seg {
+    display: flex;
+    background: #f1f5f9;
+    padding: 3px;
+    border-radius: 8px;
+    gap: 3px;
+  }
+  .seg button {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 6px 4px;
+    font-size: 12px;
+  }
+  .seg button.active {
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  }
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 10px;
+    border-top: 1px solid #e2e8f0;
+    font-family: monospace;
+    font-size: 12px;
+  }
+  .preview-stage {
+    background: #0f172a;
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 380px;
+  }
+  canvas {
+    max-width: 100%;
+    max-height: 440px;
+    background: #ffffff;
+    display: block;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="title">Brother HL-1201 Print</span>
+  <div class="header-actions">
+    <button type="button" id="usbBtn" onclick="connectUsb()">Connect USB OTG</button>
+    <button type="button" class="primary" id="printBtn" onclick="printJob()" disabled>Print (0 Pages)</button>
+  </div>
+</header>
+
+<div id="status"></div>
+
+<div class="container">
+  <div style="display:flex;flex-direction:column;gap:14px;">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title" id="imgHeader">Images (0 selected)</span>
+        <button type="button" class="primary" onclick="document.getElementById('fileInput').click()">Select Images</button>
+        <input id="fileInput" type="file" accept="image/*" multiple style="display:none" onchange="handleFiles(this.files); this.value='';" />
+      </div>
+      <div id="fileList" class="file-list">
+        <div style="padding:18px;text-align:center;color:#64748b;" onclick="document.getElementById('fileInput').click()">
+          Tap to select one or more images
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Page &amp; Margin Setup</span>
+      </div>
+
+      <div class="field">
+        <label>Page Size</label>
+        <select id="paperSize" onchange="updateSettings()">
+          <option value="A4">A4 (210 × 297 mm)</option>
+          <option value="Letter">Letter (215.9 × 279.4 mm)</option>
+          <option value="Legal">Legal (215.9 × 355.6 mm)</option>
+          <option value="Folio">Folio (215.9 × 330.2 mm)</option>
+          <option value="A5">A5 (148 × 210 mm)</option>
+          <option value="B5">B5 (182 × 257 mm)</option>
+          <option value="Executive">Executive (184.2 × 266.7 mm)</option>
+        </select>
+      </div>
+
+      <div class="grid-2 field">
+        <div>
+          <label>Orientation</label>
+          <div class="seg">
+            <button type="button" id="orientPortrait" class="active" onclick="setOrient('portrait')">Portrait</button>
+            <button type="button" id="orientLandscape" onclick="setOrient('landscape')">Landscape</button>
+          </div>
+        </div>
+        <div>
+          <label>Image Fit</label>
+          <div class="seg">
+            <button type="button" id="fitContain" class="active" onclick="setFit('contain')">Fit</button>
+            <button type="button" id="fitCover" onclick="setFit('cover')">Fill</button>
+            <button type="button" id="fitStretch" onclick="setFit('stretch')">Stretch</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Margins in mm (Min 4.2 mm)</label>
+        <div class="grid-4">
+          <div>
+            <span style="font-size:11px;color:#64748b;">Top</span>
+            <input type="number" id="mTop" value="10" min="0" max="50" step="0.5" onchange="updateSettings()" />
+          </div>
+          <div>
+            <span style="font-size:11px;color:#64748b;">Bottom</span>
+            <input type="number" id="mBottom" value="10" min="0" max="50" step="0.5" onchange="updateSettings()" />
+          </div>
+          <div>
+            <span style="font-size:11px;color:#64748b;">Left</span>
+            <input type="number" id="mLeft" value="10" min="0" max="50" step="0.5" onchange="updateSettings()" />
+          </div>
+          <div>
+            <span style="font-size:11px;color:#64748b;">Right</span>
+            <input type="number" id="mRight" value="10" min="0" max="50" step="0.5" onchange="updateSettings()" />
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2 field">
+        <div>
+          <label>Images per Page</label>
+          <div class="seg">
+            <button type="button" id="nup1" class="active" onclick="setNup(1)">1</button>
+            <button type="button" id="nup2" onclick="setNup(2)">2</button>
+            <button type="button" id="nup4" onclick="setNup(4)">4</button>
+          </div>
+        </div>
+        <div>
+          <label>Copies (Max 150)</label>
+          <input type="number" id="copies" value="1" min="1" max="150" onchange="updateSettings()" />
+        </div>
+      </div>
+
+      <div class="summary-row">
+        <span id="pageFormula">Pages: 0 × Copies: 1</span>
+        <span id="sheetTotal">Total Sheets: 0 / 150</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span id="sheetSpec" style="font-family:monospace;font-size:12px;color:#475569;">A4 (210 × 297 mm)</span>
+      <div style="display:flex;align-items:center;gap:6px;font-family:monospace;font-size:12px;">
+        <button type="button" onclick="changePage(-1)">&lt;</button>
+        <span id="pageLabel">Page 0 of 0</span>
+        <button type="button" onclick="changePage(1)">&gt;</button>
+      </div>
+    </div>
+    <div class="preview-stage">
+      <canvas id="previewCanvas" width="420" height="594"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+const SIZES = {
+  A4: { w: 210, h: 297, pjl: 'A4' },
+  Letter: { w: 215.9, h: 279.4, pjl: 'LETTER' },
+  Legal: { w: 215.9, h: 355.6, pjl: 'LEGAL' },
+  Folio: { w: 215.9, h: 330.2, pjl: 'FOLIO' },
+  A5: { w: 148, h: 210, pjl: 'A5' },
+  B5: { w: 182, h: 257, pjl: 'B5' },
+  Executive: { w: 184.2, h: 266.7, pjl: 'EXECUTIVE' }
+};
+
+let files = [];
+let orient = 'portrait';
+let fitMode = 'contain';
+let nUp = 1;
+let pageIdx = 0;
+
+function showStatus(msg) {
+  const el = document.getElementById('status');
+  if (!msg) { el.style.display = 'none'; return; }
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function handleFiles(fileList) {
+  if (!fileList) return;
+  Array.from(fileList).forEach(file => {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        files.push({
+          id: Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+          name: file.name,
+          img: img,
+          src: e.target.result,
+          selected: true,
+          rot: 0
+        });
+        renderUI();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function toggleFile(id) {
+  files = files.map(f => f.id === id ? { ...f, selected: !f.selected } : f);
+  renderUI();
+}
+
+function rotateFile(id) {
+  files = files.map(f => f.id === id ? { ...f, rot: (f.rot + 90) % 360 } : f);
+  renderUI();
+}
+
+function removeFile(id) {
+  files = files.filter(f => f.id !== id);
+  renderUI();
+}
+
+function setOrient(v) {
+  orient = v;
+  document.getElementById('orientPortrait').className = v === 'portrait' ? 'active' : '';
+  document.getElementById('orientLandscape').className = v === 'landscape' ? 'active' : '';
+  renderUI();
+}
+
+function setFit(v) {
+  fitMode = v;
+  document.getElementById('fitContain').className = v === 'contain' ? 'active' : '';
+  document.getElementById('fitCover').className = v === 'cover' ? 'active' : '';
+  document.getElementById('fitStretch').className = v === 'stretch' ? 'active' : '';
+  renderUI();
+}
+
+function setNup(v) {
+  nUp = v;
+  document.getElementById('nup1').className = v === 1 ? 'active' : '';
+  document.getElementById('nup2').className = v === 2 ? 'active' : '';
+  document.getElementById('nup4').className = v === 4 ? 'active' : '';
+  renderUI();
+}
+
+function updateSettings() { renderUI(); }
+
+function getSettings() {
+  const sizeKey = document.getElementById('paperSize').value;
+  const spec = SIZES[sizeKey];
+  const wMm = orient === 'landscape' ? spec.h : spec.w;
+  const hMm = orient === 'landscape' ? spec.w : spec.h;
+  return {
+    sizeKey,
+    pjl: spec.pjl,
+    wMm,
+    hMm,
+    mTop: Math.max(0, parseFloat(document.getElementById('mTop').value) || 0),
+    mBottom: Math.max(0, parseFloat(document.getElementById('mBottom').value) || 0),
+    mLeft: Math.max(0, parseFloat(document.getElementById('mLeft').value) || 0),
+    mRight: Math.max(0, parseFloat(document.getElementById('mRight').value) || 0),
+    copies: Math.max(1, Math.min(150, parseInt(document.getElementById('copies').value, 10) || 1))
+  };
+}
+
+function getPages() {
+  const active = files.filter(f => f.selected);
+  const pages = [];
+  for (let i = 0; i < active.length; i += nUp) {
+    pages.push(active.slice(i, i + nUp));
+  }
+  return pages;
+}
+
+function changePage(delta) {
+  const pages = getPages();
+  if (pages.length === 0) return;
+  pageIdx = Math.max(0, Math.min(pages.length - 1, pageIdx + delta));
+  renderUI();
+}
+
+function renderSheetCanvas(canvas, items, cfg, pxPerMm, drawGuide) {
+  const cw = Math.round(cfg.wMm * pxPerMm);
+  const ch = Math.round(cfg.hMm * pxPerMm);
+  canvas.width = cw;
+  canvas.height = ch;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, cw, ch);
+
+  const ml = Math.round(cfg.mLeft * pxPerMm);
+  const mr = Math.round(cfg.mRight * pxPerMm);
+  const mt = Math.round(cfg.mTop * pxPerMm);
+  const mb = Math.round(cfg.mBottom * pxPerMm);
+  const pw = Math.max(10, cw - ml - mr);
+  const ph = Math.max(10, ch - mt - mb);
+
+  if (items && items.length > 0) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(ml, mt, pw, ph);
+    ctx.clip();
+
+    let cols = 1, rows = 1;
+    if (nUp === 2) {
+      if (cfg.wMm >= cfg.hMm) cols = 2; else rows = 2;
+    } else if (nUp === 4) {
+      cols = 2; rows = 2;
+    }
+    const gap = nUp > 1 ? Math.round(4 * pxPerMm) : 0;
+    const cellW = (pw - gap * (cols - 1)) / cols;
+    const cellH = (ph - gap * (rows - 1)) / rows;
+
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const cx = ml + col * (cellW + gap);
+      const cy = mt + row * (cellH + gap);
+
+      const rot90 = it.rot === 90 || it.rot === 270;
+      const sw = rot90 ? it.img.naturalHeight : it.img.naturalWidth;
+      const sh = rot90 ? it.img.naturalWidth : it.img.naturalHeight;
+      let dw = cellW, dh = cellH;
+
+      if (fitMode === 'contain') {
+        const s = Math.min(cellW / sw, cellH / sh);
+        dw = sw * s; dh = sh * s;
+      } else if (fitMode === 'cover') {
+        const s = Math.max(cellW / sw, cellH / sh);
+        dw = sw * s; dh = sh * s;
+      }
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(cx, cy, cellW, cellH);
+      ctx.clip();
+      ctx.translate(cx + cellW / 2, cy + cellH / 2);
+      ctx.rotate(it.rot * Math.PI / 180);
+      if (rot90) {
+        ctx.drawImage(it.img, -dh / 2, -dw / 2, dh, dw);
+      } else {
+        ctx.drawImage(it.img, -dw / 2, -dh / 2, dw, dh);
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // 4.2 mm hardware border clamp
+  const hw = Math.round(4.2 * pxPerMm);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, cw, hw);
+  ctx.fillRect(0, ch - hw, cw, hw);
+  ctx.fillRect(0, 0, hw, ch);
+  ctx.fillRect(cw - hw, 0, hw, ch);
+
+  // 1-bit Atkinson laser halftoning
+  const imgData = ctx.getImageData(0, 0, cw, ch);
+  const d = imgData.data;
+  const lum = new Float32Array(cw * ch);
+  for (let i = 0; i < cw * ch; i++) {
+    const idx = i * 4;
+    lum[i] = 0.299 * d[idx] + 0.587 * d[idx + 1] + 0.114 * d[idx + 2];
+  }
+  for (let y = 0; y < ch; y++) {
+    const rOff = y * cw;
+    for (let x = 0; x < cw; x++) {
+      const i = rOff + x;
+      const oldV = lum[i];
+      const newV = oldV < 128 ? 0 : 255;
+      const err = (oldV - newV) * 0.125;
+      if (x + 1 < cw) lum[i + 1] += err;
+      if (x + 2 < cw) lum[i + 2] += err;
+      if (y + 1 < ch) {
+        if (x - 1 >= 0) lum[i + cw - 1] += err;
+        lum[i + cw] += err;
+        if (x + 1 < cw) lum[i + cw + 1] += err;
+      }
+      if (y + 2 < ch) lum[i + cw * 2] += err;
+      const idx = i * 4;
+      d[idx] = d[idx + 1] = d[idx + 2] = newV;
+      d[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  if (drawGuide) {
+    ctx.save();
+    ctx.strokeStyle = '#2563eb';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(ml, mt, pw, ph);
+    ctx.restore();
+  }
+  return imgData;
+}
+
+function renderUI() {
+  const cfg = getSettings();
+  const pages = getPages();
+  const selectedCount = files.filter(f => f.selected).length;
+  if (pageIdx >= pages.length) pageIdx = Math.max(0, pages.length - 1);
+
+  document.getElementById('imgHeader').textContent = 'Images (' + selectedCount + ' selected)';
+  const listEl = document.getElementById('fileList');
+  if (files.length === 0) {
+    listEl.innerHTML = '<div style="padding:18px;text-align:center;color:#64748b;" onclick="document.getElementById(\'fileInput\').click()">Tap to select one or more images</div>';
+  } else {
+    listEl.innerHTML = files.map(f => `
+      <div class="file-row">
+        <div class="file-left">
+          <input type="checkbox" ${f.selected ? 'checked' : ''} onchange="toggleFile('${f.id}')" />
+          <img class="thumb" src="${f.src}" />
+          <span class="file-name">${f.name}</span>
+        </div>
+        <div style="display:flex;gap:4px;">
+          <button type="button" onclick="rotateFile('${f.id}')">↻</button>
+          <button type="button" onclick="removeFile('${f.id}')">✕</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  const totalSheets = pages.length * cfg.copies;
+  document.getElementById('pageFormula').textContent = 'Pages: ' + pages.length + ' × Copies: ' + cfg.copies;
+  document.getElementById('sheetTotal').textContent = 'Total Sheets: ' + totalSheets + ' / 150';
+  document.getElementById('sheetSpec').textContent = cfg.sizeKey + ' (' + cfg.wMm + ' × ' + cfg.hMm + ' mm)';
+  document.getElementById('pageLabel').textContent = 'Page ' + (pages.length ? pageIdx + 1 : 0) + ' of ' + pages.length;
+
+  const printBtn = document.getElementById('printBtn');
+  printBtn.disabled = pages.length === 0;
+  printBtn.textContent = 'Print (' + totalSheets + ' Page' + (totalSheets === 1 ? '' : 's') + ')';
+
+  const canvas = document.getElementById('previewCanvas');
+  renderSheetCanvas(canvas, pages[pageIdx], cfg, 3.0, true);
+}
+
+function connectUsb() {
+  if (window.AndroidUsb) {
+    const res = window.AndroidUsb.connectPrinter();
+    showStatus(res);
+  } else {
+    showStatus('USB OTG Bridge ready.');
+  }
+}
+
+function encodePrnBase64(bitmaps, cfg) {
+  const header = [
+    '\x1b%-12345X@PJL JOB NAME="HL1201_ANDROID_OTG"',
+    '@PJL SET RESOLUTION = 600',
+    '@PJL SET ECONOMODE = OFF',
+    '@PJL SET MEDIATYPE = REGULAR',
+    '@PJL SET SOURCETRAY = AUTO',
+    '@PJL SET PAPER = ' + cfg.pjl,
+    '@PJL SET ORIENTATION = ' + orient.toUpperCase(),
+    '@PJL SET COPIES = ' + cfg.copies,
+    '@PJL ENTER LANGUAGE = PCL',
+    ''
+  ].join('\r\n');
+
+  const bytes = [];
+  for (let i = 0; i < header.length; i++) bytes.push(header.charCodeAt(i));
+
+  for (let p = 0; p < bitmaps.length; p++) {
+    const bmp = bitmaps[p];
+    const w = bmp.width, h = bmp.height;
+    const rowLen = Math.ceil(w / 8);
+    const rowBuf = new Uint8Array(rowLen);
+
+    const initCmd = '\x1bE\x1b*t600R\x1b*r1A';
+    for (let i = 0; i < initCmd.length; i++) bytes.push(initCmd.charCodeAt(i));
+
+    for (let y = 0; y < h; y++) {
+      rowBuf.fill(0);
+      let hasBlack = false;
+      const yOff = y * w;
+      for (let x = 0; x < w; x++) {
+        if (bmp.data[(yOff + x) * 4] < 128) {
+          rowBuf[x >> 3] |= (0x80 >> (x & 7));
+          hasBlack = true;
+        }
+      }
+      if (!hasBlack) {
+        bytes.push(0xff);
+        continue;
+      }
+      const rle = [];
+      let i = 0;
+      while (i < rowLen) {
+        let run = 1;
+        while (i + run < rowLen && run < 128 && rowBuf[i + run] === rowBuf[i]) run++;
+        if (run > 2) {
+          rle.push((257 - run) & 0xff, rowBuf[i]);
+          i += run;
+        } else {
+          const start = i;
+          let lit = 0;
+          while (i < rowLen && lit < 128) {
+            if (i + 2 < rowLen && rowBuf[i] === rowBuf[i + 1] && rowBuf[i] === rowBuf[i + 2]) break;
+            i++; lit++;
+          }
+          rle.push((lit - 1) & 0xff);
+          for (let k = 0; k < lit; k++) rle.push(rowBuf[start + k]);
+        }
+      }
+      const cmd = '\x1b*b' + rle.length + 'W';
+      for (let c = 0; c < cmd.length; c++) bytes.push(cmd.charCodeAt(c));
+      for (let c = 0; c < rle.length; c++) bytes.push(rle[c]);
+    }
+    const endCmd = '\x1b*rC\x0c';
+    for (let i = 0; i < endCmd.length; i++) bytes.push(endCmd.charCodeAt(i));
+  }
+
+  const footer = '\x1b%-12345X@PJL EOJ\r\n\x1b%-12345X';
+  for (let i = 0; i < footer.length; i++) bytes.push(footer.charCodeAt(i));
+
+  let binary = '';
+  const chunk = 8192;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.slice(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+function printJob() {
+  const cfg = getSettings();
+  const pages = getPages();
+  if (pages.length === 0) return;
+
+  showStatus('Preparing ' + (pages.length * cfg.copies) + ' page(s)...');
+  setTimeout(() => {
+    const offscreen = document.createElement('canvas');
+    const bitmaps = [];
+    for (let i = 0; i < pages.length; i++) {
+      bitmaps.push(renderSheetCanvas(offscreen, pages[i], cfg, 8.0, false));
+    }
+    if (window.AndroidUsb) {
+      const b64 = encodePrnBase64(bitmaps, cfg);
+      const res = window.AndroidUsb.printBase64Job(b64);
+      showStatus(res);
+    } else {
+      window.print();
+    }
+  }, 50);
+}
+</script>
+</body>
+</html>

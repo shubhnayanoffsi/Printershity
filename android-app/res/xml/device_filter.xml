@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brother Industries, Ltd. (VID 0x04F9 = 1273) -->
+    <usb-device vendor-id="1273" />
+    <!-- Generic USB Printer Class (Class 7) -->
+    <usb-device class="7" />
+</resources>

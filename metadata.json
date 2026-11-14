@@ -1,0 +1,6 @@
+{
+  "name": "Brother HL-1201 USB-OTG Direct Print Studio",
+  "description": "Direct USB Type-B to Type-C OTG monochrome laser image printing utility and raster preprocessor for the Brother HL-1201 printer with multi-file batching, physical margin calibration, 1-bit halftoning, and PJL/RLE stream generation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
